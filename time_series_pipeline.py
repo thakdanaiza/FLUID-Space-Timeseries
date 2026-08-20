@@ -333,22 +333,22 @@ def save_histogram_heatmaps(
         for kind, matrices, vmax, colorbar_label in configurations:
             figure, axis = plt.subplots(figsize=(9.2, 5.2))
             image = axis.imshow(
-                matrices[channel],
+                matrices[channel].T,
                 origin="lower",
                 aspect="auto",
-                extent=(1.0, 2.0, 0.0, float(elapsed_times.size)),
+                extent=(0.0, float(elapsed_times.size), 1.0, 2.0),
                 cmap="magma",
                 vmin=0.0,
                 vmax=max(vmax, np.finfo(float).eps),
                 interpolation="nearest",
             )
-            axis.set_yticks(
+            axis.set_xticks(
                 tick_indices.astype(float) + 0.5,
                 [f"{elapsed_times[index]:.3g}" for index in tick_indices],
             )
-            axis.set_xlabel("Phase index")
-            axis.set_xlim(1.0, 2.0)
-            axis.set_ylabel("Elapsed time from start frame (s)")
+            axis.set_xlabel("Elapsed time from start frame (s)")
+            axis.set_ylabel("Phase index")
+            axis.set_ylim(1.0, 2.0)
             axis.set_title(f"{channel} · Pixel {kind}")
             colorbar = figure.colorbar(image, ax=axis, pad=0.02)
             colorbar.set_label(colorbar_label)
