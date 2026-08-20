@@ -199,14 +199,39 @@ def save_time_series_graph(
     )
     for axis, channel in zip(axes.flat, channels):
         channel_rows = [row for row in rows if row["channel"] == channel]
-        elapsed = [float(row["elapsed_time_sec"]) for row in channel_rows]
-        means = [float(row["mean_phase_index"]) for row in channel_rows]
-        axis.plot(elapsed, means, color="#1976a3", linewidth=1.6, marker="o", markersize=2.5)
+        elapsed = np.asarray(
+            [float(row["elapsed_time_sec"]) for row in channel_rows], dtype=float
+        )
+        means = np.asarray(
+            [float(row["mean_phase_index"]) for row in channel_rows], dtype=float
+        )
+        standard_deviations = np.asarray(
+            [float(row["std_phase_index"]) for row in channel_rows], dtype=float
+        )
+        axis.fill_between(
+            elapsed,
+            means - standard_deviations,
+            means + standard_deviations,
+            color="#1976a3",
+            alpha=0.18,
+            linewidth=0,
+            label="Mean ± 1 SD",
+        )
+        axis.plot(
+            elapsed,
+            means,
+            color="#1976a3",
+            linewidth=1.6,
+            marker="o",
+            markersize=2.5,
+            label="Mean",
+        )
         axis.axhline(1.5, color="#222222", linestyle="--", linewidth=0.9)
         axis.set_title(channel)
         axis.set_ylim(1.0, 2.0)
         axis.set_ylabel("Mean phase index")
         axis.grid(alpha=0.2)
+        axis.legend(frameon=False, fontsize=8, loc="best")
     for axis in axes.flat[len(channels) :]:
         axis.set_visible(False)
     for axis in axes[-1, :]:

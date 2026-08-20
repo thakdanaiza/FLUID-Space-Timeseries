@@ -55,7 +55,7 @@ The phase index ranges from approximately 1 to 2, where 1 represents the water r
 
 Each run is stored in `profiles/<profile-name>/runs/run_xxx/` and contains only:
 
-- `graphs/phase_time_series.png`: one subplot per selected result channel
+- `graphs/phase_time_series.png`: one subplot per selected result channel, with a shaded mean ± 1 SD band
 - `time_series.csv`: frame-level values in long format
 - `summary.json`: frame range, sampled frames, video and geometry hashes, calibration values, and channel summaries
 
