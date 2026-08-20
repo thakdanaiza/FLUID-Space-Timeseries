@@ -242,6 +242,126 @@ def save_time_series_graph(
     plt.close(figure)
 
 
+<<<<<<< Updated upstream
+=======
+def phase_histogram(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    flattened = np.asarray(values, dtype=np.float64).reshape(-1)
+    counts, _ = np.histogram(flattened, bins=PHASE_HISTOGRAM_EDGES)
+    if int(counts.sum()) != int(flattened.size):
+        raise ValueError("Phase histogram contains values outside the 1.0 to 2.0 range")
+    percentages = counts.astype(np.float64) * (100.0 / max(1, int(counts.sum())))
+    return counts.astype(np.int64), percentages
+
+
+def save_phase_histogram_csv(
+    path: Path,
+    frame_indices: list[int],
+    fps: float,
+    start_frame: int,
+    channels: tuple[str, ...],
+    count_matrices: dict[str, np.ndarray],
+    percent_matrices: dict[str, np.ndarray],
+) -> None:
+    fields = (
+        "frame_index",
+        "video_time_sec",
+        "elapsed_time_sec",
+        "channel",
+        "bin_lower",
+        "bin_upper",
+        "bin_center",
+        "pixel_count",
+        "pixel_percent",
+    )
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for channel in channels:
+            for frame_position, frame_index in enumerate(frame_indices):
+                for bin_index in range(PHASE_HISTOGRAM_EDGES.size - 1):
+                    lower = float(PHASE_HISTOGRAM_EDGES[bin_index])
+                    upper = float(PHASE_HISTOGRAM_EDGES[bin_index + 1])
+                    writer.writerow(
+                        {
+                            "frame_index": frame_index,
+                            "video_time_sec": frame_index / fps,
+                            "elapsed_time_sec": (frame_index - start_frame) / fps,
+                            "channel": channel,
+                            "bin_lower": lower,
+                            "bin_upper": upper,
+                            "bin_center": (lower + upper) / 2.0,
+                            "pixel_count": int(count_matrices[channel][frame_position, bin_index]),
+                            "pixel_percent": float(
+                                percent_matrices[channel][frame_position, bin_index]
+                            ),
+                        }
+                    )
+
+
+def save_histogram_heatmaps(
+    directory: Path,
+    elapsed_times: np.ndarray,
+    channels: tuple[str, ...],
+    count_matrices: dict[str, np.ndarray],
+    percent_matrices: dict[str, np.ndarray],
+) -> dict[str, Any]:
+    count_vmax = max(float(matrix.max()) for matrix in count_matrices.values())
+    percent_vmax = max(float(matrix.max()) for matrix in percent_matrices.values())
+    tick_indices = np.unique(
+        np.linspace(0, elapsed_times.size - 1, min(8, elapsed_times.size), dtype=int)
+    )
+    files: dict[str, dict[str, str]] = {}
+    configurations = (
+        (
+            "count",
+            count_matrices,
+            count_vmax,
+            "Valid pixels per 0.01 phase bin",
+        ),
+        (
+            "percent",
+            percent_matrices,
+            percent_vmax,
+            "% valid pixels per 0.01 phase bin",
+        ),
+    )
+    for channel in channels:
+        files[channel] = {}
+        for kind, matrices, vmax, colorbar_label in configurations:
+            figure, axis = plt.subplots(figsize=(9.2, 5.2))
+            image = axis.imshow(
+                matrices[channel].T,
+                origin="lower",
+                aspect="auto",
+                extent=(0.0, float(elapsed_times.size), 1.0, 2.0),
+                cmap="magma",
+                vmin=0.0,
+                vmax=max(vmax, np.finfo(float).eps),
+                interpolation="nearest",
+            )
+            axis.set_xticks(
+                tick_indices.astype(float) + 0.5,
+                [f"{elapsed_times[index]:.3g}" for index in tick_indices],
+            )
+            axis.set_xlabel("Elapsed time from start frame (s)")
+            axis.set_ylabel("Phase index")
+            axis.set_ylim(1.0, 2.0)
+            axis.set_title(f"{channel} · Pixel {kind}")
+            colorbar = figure.colorbar(image, ax=axis, pad=0.02)
+            colorbar.set_label(colorbar_label)
+            figure.tight_layout()
+            filename = f"phase_histogram_{kind}_{channel}.png"
+            figure.savefig(directory / filename, dpi=220)
+            plt.close(figure)
+            files[channel][kind] = f"histograms/{filename}"
+    return {
+        "count_color_limits": [0.0, count_vmax],
+        "percent_color_limits": [0.0, percent_vmax],
+        "files": files,
+    }
+
+
+>>>>>>> Stashed changes
 def save_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 

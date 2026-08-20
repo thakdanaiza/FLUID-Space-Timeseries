@@ -1204,9 +1204,12 @@
   },
   "settings": {
     "bubble_smooth_radius": 3,
-    "equalize_cad_lengths": true
+    "equalize_cad_lengths": true,
+    "result_channels": [
+      "CH1-1"
+    ]
   },
-  "updated_at_utc": "2026-08-20T03:22:23.240184+00:00",
+  "updated_at_utc": "2026-08-20T06:04:46.084987+00:00",
   "source_video": {
     "path": "../../assets/reference.mp4",
     "name": "reference.mp4",
