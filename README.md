@@ -179,7 +179,7 @@ The main result image is:
 graphs/phase_time_series.png
 ```
 
-The run folder contains the graph, `time_series.csv`, and `summary.json`. Each subplot shows the channel mean with a shaded `Mean ± 1 SD` band; the underlying frame-level SD values are retained in the CSV. This time-series version does not export phase maps, masks, arrays, PDFs, or quality-control images.
+The run folder contains the time-series graph, `time_series.csv`, `phase_histogram.csv`, histogram heatmaps, and `summary.json`. Each time-series subplot shows the channel mean with a shaded `Mean ± 1 SD` band. For every selected channel, the `histograms/` folder contains separate pixel-count and within-frame pixel-percentage heatmaps with phase index 1–2 on the X axis and elapsed time on the Y axis. This version does not export phase maps, masks, arrays, PDFs, or quality-control images.
 
 ## Troubleshooting
 
