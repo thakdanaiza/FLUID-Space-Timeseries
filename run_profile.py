@@ -90,6 +90,8 @@ def command_for_profile(profile_name: str, check: bool = False) -> list[str]:
         "--cad-placement-config", str(root / "assets" / "cad_placement.json"),
         "--output-root", str(profile_path(profile_name).parent / "runs"),
     ]
+    for video_output in profile["settings"]["video_outputs"]:
+        command.extend(("--video-output", video_output))
     if check:
         command.append("--check")
     return command

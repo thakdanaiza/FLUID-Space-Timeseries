@@ -14,6 +14,7 @@ from typing import Any
 
 CHANNELS = ("CH1-1", "CH1-2", "CH2-1", "CH2-2")
 ZONES = CHANNELS
+VIDEO_OUTPUTS = ("count", "percent")
 PROFILE_SCHEMA = 2
 DEFAULT_VIDEO = "../../assets/reference.mp4"
 
@@ -154,6 +155,17 @@ def validate_profile(payload: dict[str, Any], require_complete: bool = True) -> 
     result.setdefault("settings", {})
     result["settings"].setdefault("bubble_smooth_radius", 3)
     result["settings"].setdefault("equalize_cad_lengths", True)
+    raw_video_outputs = result["settings"].get("video_outputs", [])
+    if not isinstance(raw_video_outputs, list):
+        raise ValueError("Video outputs must be a list")
+    unknown_video_outputs = [name for name in raw_video_outputs if name not in VIDEO_OUTPUTS]
+    if unknown_video_outputs:
+        raise ValueError(
+            f"Unknown video outputs: {', '.join(map(str, unknown_video_outputs))}"
+        )
+    result["settings"]["video_outputs"] = [
+        name for name in VIDEO_OUTPUTS if name in raw_video_outputs
+    ]
     raw_result_channels = result["settings"].get("result_channels", list(CHANNELS))
     if not isinstance(raw_result_channels, list):
         raise ValueError("Result channels must be a list")

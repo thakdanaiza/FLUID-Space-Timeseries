@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "name": "current_baseline",
+  "name": "video-test",
   "description": "Baseline imported from the approved CAD-authoritative setup.",
   "frame": {
     "start": 10,
@@ -1206,17 +1206,17 @@
     "bubble_smooth_radius": 3,
     "equalize_cad_lengths": true,
     "result_channels": [
-      "CH1-1",
-      "CH1-2",
-      "CH2-1",
-      "CH2-2"
+      "CH1-1"
+    ],
+    "video_outputs": [
+      "count"
     ]
   },
-  "updated_at_utc": "2026-08-20T06:15:51.611759+00:00",
   "source_video": {
     "path": "../../assets/reference.mp4",
     "name": "reference.mp4",
     "fps": 30.0,
     "frame_count": 306
-  }
+  },
+  "updated_at_utc": "2026-08-20T07:30:15.060330+00:00"
 }

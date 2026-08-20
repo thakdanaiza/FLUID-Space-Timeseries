@@ -31,6 +31,8 @@ from phase_analysis_core import (
 PHASE_HISTOGRAM_EDGES = np.round(
     np.linspace(1.0, 2.0, 101, dtype=np.float64), 2
 )
+VIDEO_OUTPUT_KINDS = ("count", "percent")
+VIDEO_FRAME_SIZE = (1600, 1000)
 
 
 def open_video_capture(video_path: Path) -> cv2.VideoCapture:
@@ -55,6 +57,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cad-roi-masks", required=True)
     parser.add_argument("--cad-placement-config")
     parser.add_argument("--output-root", required=True)
+    parser.add_argument(
+        "--video-output",
+        action="append",
+        choices=VIDEO_OUTPUT_KINDS,
+        default=[],
+        help="Histogram video type to export; repeat to select both types",
+    )
     parser.add_argument("--check", action="store_true")
     return parser.parse_args()
 
@@ -364,6 +373,215 @@ def save_histogram_heatmaps(
     }
 
 
+def masked_frame_crop(frame_bgr: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Return an RGB tight crop with every pixel outside the analysis mask blacked out."""
+    rows, columns = np.nonzero(mask)
+    if rows.size == 0:
+        raise ValueError("Cannot create a video crop from an empty analysis mask")
+    top, bottom = int(rows.min()), int(rows.max()) + 1
+    left, right = int(columns.min()), int(columns.max()) + 1
+    crop = cv2.cvtColor(frame_bgr[top:bottom, left:right], cv2.COLOR_BGR2RGB)
+    crop_mask = mask[top:bottom, left:right]
+    result = crop.copy()
+    result[~crop_mask] = 0
+    return result
+
+
+def _histogram_video_figure(
+    channel: str,
+    kind: str,
+    matrix: np.ndarray,
+    vmax: float,
+    elapsed_times: np.ndarray,
+    crop_shape: tuple[int, int],
+) -> tuple[Any, Any, Any, Any]:
+    colorbar_label = (
+        "Valid pixels per 0.01 phase bin"
+        if kind == "count"
+        else "% valid pixels per 0.01 phase bin"
+    )
+    tick_indices = np.unique(
+        np.linspace(0, elapsed_times.size - 1, min(8, elapsed_times.size), dtype=int)
+    )
+    width, height = VIDEO_FRAME_SIZE
+    figure = plt.figure(figsize=(width / 160.0, height / 160.0), dpi=160)
+    grid = figure.add_gridspec(2, 1, height_ratios=(0.9, 1.1), hspace=0.34)
+    video_axis = figure.add_subplot(grid[0])
+    histogram_axis = figure.add_subplot(grid[1])
+
+    source_image = video_axis.imshow(
+        np.zeros((crop_shape[0], crop_shape[1], 3), dtype=np.uint8),
+        interpolation="nearest",
+    )
+    video_axis.set_axis_off()
+    video_title = video_axis.set_title(channel)
+
+    heatmap = histogram_axis.imshow(
+        matrix.T,
+        origin="lower",
+        aspect="auto",
+        extent=(0.0, float(elapsed_times.size), 1.0, 2.0),
+        cmap="magma",
+        vmin=0.0,
+        vmax=max(vmax, np.finfo(float).eps),
+        interpolation="nearest",
+    )
+    histogram_axis.set_xticks(
+        tick_indices.astype(float) + 0.5,
+        [f"{elapsed_times[index]:.3g}" for index in tick_indices],
+    )
+    histogram_axis.set_xlabel("Elapsed time from start frame (s)")
+    histogram_axis.set_ylabel("Phase index")
+    histogram_axis.set_ylim(1.0, 2.0)
+    histogram_axis.set_title(f"Pixel {kind}")
+    time_line = histogram_axis.axvline(0.5, color="#ff2020", linewidth=2.2)
+    colorbar = figure.colorbar(heatmap, ax=histogram_axis, pad=0.02)
+    colorbar.set_label(colorbar_label)
+    figure.subplots_adjust(left=0.08, right=0.91, top=0.95, bottom=0.09)
+    return figure, source_image, video_title, time_line
+
+
+def save_histogram_videos(
+    directory: Path,
+    video_path: Path,
+    frame_indices: list[int],
+    start_frame: int,
+    source_fps: float,
+    frame_step: int,
+    channels: tuple[str, ...],
+    output_kinds: tuple[str, ...],
+    expected_shape: tuple[int, int],
+    masks: dict[str, Any],
+    count_matrices: dict[str, np.ndarray],
+    percent_matrices: dict[str, np.ndarray],
+) -> dict[str, Any]:
+    try:
+        import imageio_ffmpeg
+    except ImportError as exc:
+        raise RuntimeError(
+            "Histogram video output requires imageio-ffmpeg; install the project requirements"
+        ) from exc
+
+    output_fps = source_fps / frame_step
+    matrices = {"count": count_matrices, "percent": percent_matrices}
+    maxima = {
+        "count": max(float(matrix.max()) for matrix in count_matrices.values()),
+        "percent": max(float(matrix.max()) for matrix in percent_matrices.values()),
+    }
+    elapsed_times = np.asarray(
+        [(index - start_frame) / source_fps for index in frame_indices], dtype=float
+    )
+    directory.mkdir()
+    renderers: list[dict[str, Any]] = []
+    files: dict[str, dict[str, str]] = {channel: {} for channel in channels}
+    completed = False
+    try:
+        for channel in channels:
+            final_mask = masks[channel].final_mask
+            rows, columns = np.nonzero(final_mask)
+            crop_shape = (
+                int(rows.max() - rows.min() + 1),
+                int(columns.max() - columns.min() + 1),
+            )
+            for kind in output_kinds:
+                filename = f"phase_histogram_{kind}_{channel}.mp4"
+                final_path = directory / filename
+                temporary_path = directory / f".{filename}.tmp.mp4"
+                figure, source_image, video_title, time_line = _histogram_video_figure(
+                    channel,
+                    kind,
+                    matrices[kind][channel],
+                    maxima[kind],
+                    elapsed_times,
+                    crop_shape,
+                )
+                writer = imageio_ffmpeg.write_frames(
+                    str(temporary_path),
+                    VIDEO_FRAME_SIZE,
+                    fps=output_fps,
+                    codec="libx264",
+                    pix_fmt_in="rgb24",
+                    pix_fmt_out="yuv420p",
+                    macro_block_size=2,
+                    ffmpeg_log_level="error",
+                    output_params=["-movflags", "+faststart"],
+                )
+                try:
+                    writer.send(None)
+                except Exception:
+                    writer.close()
+                    plt.close(figure)
+                    temporary_path.unlink(missing_ok=True)
+                    raise
+                renderers.append(
+                    {
+                        "channel": channel,
+                        "kind": kind,
+                        "figure": figure,
+                        "source_image": source_image,
+                        "video_title": video_title,
+                        "time_line": time_line,
+                        "writer": writer,
+                        "temporary_path": temporary_path,
+                        "final_path": final_path,
+                    }
+                )
+                files[channel][kind] = f"videos/{filename}"
+
+        for position, (frame_index, frame_bgr) in enumerate(
+            iter_video_frames(video_path, frame_indices, expected_shape)
+        ):
+            crops = {
+                channel: masked_frame_crop(frame_bgr, masks[channel].final_mask)
+                for channel in channels
+            }
+            elapsed = (frame_index - start_frame) / source_fps
+            for renderer in renderers:
+                renderer["source_image"].set_data(crops[renderer["channel"]])
+                renderer["video_title"].set_text(
+                    f"{renderer['channel']} · Frame {frame_index} · Elapsed {elapsed:.3f} s"
+                )
+                renderer["time_line"].set_xdata((position + 0.5, position + 0.5))
+                figure = renderer["figure"]
+                figure.canvas.draw()
+                rgb = np.asarray(figure.canvas.buffer_rgba(), dtype=np.uint8)[:, :, :3]
+                renderer["writer"].send(np.ascontiguousarray(rgb).tobytes())
+
+        for renderer in renderers:
+            renderer["writer"].close()
+            renderer["writer"] = None
+        for renderer in renderers:
+            renderer["temporary_path"].replace(renderer["final_path"])
+        completed = True
+    except Exception as exc:
+        raise RuntimeError(f"Histogram video encoding failed: {exc}") from exc
+    finally:
+        for renderer in renderers:
+            writer = renderer.get("writer")
+            if writer is not None:
+                try:
+                    writer.close()
+                except Exception:
+                    pass
+            plt.close(renderer["figure"])
+            if not completed:
+                renderer["temporary_path"].unlink(missing_ok=True)
+
+    return {
+        "enabled": True,
+        "selected_types": list(output_kinds),
+        "codec": "H.264",
+        "pixel_format": "yuv420p",
+        "audio": False,
+        "resolution": list(VIDEO_FRAME_SIZE),
+        "fps": output_fps,
+        "frame_count": len(frame_indices),
+        "playback": "sampled frames at source FPS divided by frame step",
+        "top_panel": "tight analysis-mask crop; pixels outside mask are black",
+        "files": files,
+    }
+
+
 def save_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
@@ -373,6 +591,15 @@ def run(args: argparse.Namespace) -> Path | None:
     project_path = Path(args.project).resolve()
     cad_masks_path = Path(args.cad_roi_masks).resolve()
     output_root = Path(args.output_root).resolve()
+    raw_video_outputs = list(getattr(args, "video_output", []) or [])
+    unknown_video_outputs = [
+        name for name in raw_video_outputs if name not in VIDEO_OUTPUT_KINDS
+    ]
+    if unknown_video_outputs:
+        raise ValueError(f"Unknown histogram video outputs: {unknown_video_outputs}")
+    video_outputs = tuple(
+        name for name in VIDEO_OUTPUT_KINDS if name in raw_video_outputs
+    )
     fps, frame_count, shape = video_metadata(video_path)
     indices = sampled_frame_indices(
         args.start_frame, args.end_frame, args.frame_step, frame_count
@@ -470,6 +697,26 @@ def run(args: argparse.Namespace) -> Path | None:
         count_matrices,
         percent_matrices,
     )
+    histogram_video_outputs: dict[str, Any] = {
+        "enabled": False,
+        "selected_types": [],
+        "files": {},
+    }
+    if video_outputs:
+        histogram_video_outputs = save_histogram_videos(
+            run_dir / "videos",
+            video_path,
+            indices,
+            args.start_frame,
+            fps,
+            args.frame_step,
+            channels,
+            video_outputs,
+            shape,
+            masks,
+            count_matrices,
+            percent_matrices,
+        )
 
     channel_summary: dict[str, Any] = {}
     for channel in channels:
@@ -502,6 +749,7 @@ def run(args: argparse.Namespace) -> Path | None:
             "sampled_frames": indices,
         },
         "result_channels": list(channels),
+        "histogram_videos": histogram_video_outputs,
         "histogram": {
             "bin_count": int(PHASE_HISTOGRAM_EDGES.size - 1),
             "bin_width": 0.01,

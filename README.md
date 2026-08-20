@@ -131,6 +131,8 @@ Only the selected channel's setup is displayed. Use the **CAD overlay** checkbox
 
 Use the **Result channels** checkboxes to choose which channels are processed and exported. At least one result channel must remain selected; the channel radio buttons above them still control only which geometry is being edited.
 
+Use the **Video outputs** checkboxes to optionally create animated Count and/or Percent histogram videos. Both are off by default. Leaving both unchecked keeps the image/CSV/JSON workflow and does not run the video encoder.
+
 ### 5. Edit the analysis setup
 
 Select the item you want to edit:
@@ -179,7 +181,9 @@ The main result image is:
 graphs/phase_time_series.png
 ```
 
-The run folder contains the time-series graph, `time_series.csv`, `phase_histogram.csv`, histogram heatmaps, and `summary.json`. Each time-series subplot shows the channel mean with a shaded `Mean ± 1 SD` band. For every selected channel, the `histograms/` folder contains separate pixel-count and within-frame pixel-percentage heatmaps with phase index 1–2 on the X axis and elapsed time on the Y axis. This version does not export phase maps, masks, arrays, PDFs, or quality-control images.
+The run folder contains the time-series graph, `time_series.csv`, `phase_histogram.csv`, histogram heatmaps, and `summary.json`. Each time-series subplot shows the channel mean with a shaded `Mean ± 1 SD` band. For every selected channel, the `histograms/` folder contains separate pixel-count and within-frame pixel-percentage heatmaps with elapsed time on the X axis and phase index 1–2 on the Y axis.
+
+If a Video output is selected, the `videos/` folder contains the corresponding `phase_histogram_count_<channel>.mp4` and/or `phase_histogram_percent_<channel>.mp4`. The upper panel is a tight crop of the channel's actual analysis mask, with excluded pixels blacked out. The lower panel is the complete histogram heatmap, and a red line follows the sampled frame being shown. Videos contain no audio and play at `source FPS / Step`, so skipped frames retain the original elapsed-time spacing. This version does not export phase maps, masks, arrays, PDFs, or quality-control images.
 
 ## Troubleshooting
 

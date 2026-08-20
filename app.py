@@ -16,6 +16,7 @@ from PIL import Image, ImageTk
 
 from profile_store import (
     CHANNELS,
+    VIDEO_OUTPUTS,
     copy_video_into_profile,
     duplicate_profile,
     list_profiles,
@@ -75,6 +76,9 @@ class FluidSpaceApp:
         self.active_channel = tk.StringVar(value=CHANNELS[0])
         self.result_channel_vars = {
             channel: tk.BooleanVar(value=True) for channel in CHANNELS
+        }
+        self.video_output_vars = {
+            output: tk.BooleanVar(value=False) for output in VIDEO_OUTPUTS
         }
         self.cad_visible = tk.BooleanVar(value=True)
         self.status_var = tk.StringVar(value="Ready")
@@ -161,6 +165,16 @@ class FluidSpaceApp:
                 variable=self.result_channel_vars[channel],
                 command=self.result_channels_changed,
             ).grid(row=index // 2, column=index % 2, sticky="w", padx=(0, 14), pady=1)
+        ttk.Label(sidebar, text="Video outputs").pack(anchor="w", pady=(7, 2))
+        video_output_frame = ttk.Frame(sidebar)
+        video_output_frame.pack(fill="x")
+        for output in VIDEO_OUTPUTS:
+            ttk.Checkbutton(
+                video_output_frame,
+                text=output.title(),
+                variable=self.video_output_vars[output],
+                command=self.video_outputs_changed,
+            ).pack(side="left", padx=(0, 18))
 
         ttk.Separator(sidebar).pack(fill="x", pady=12)
         ttk.Label(sidebar, text="3  Select drawing", style="Step.TLabel").pack(anchor="w", pady=(0, 6))
@@ -239,6 +253,9 @@ class FluidSpaceApp:
         selected_results = set(self.profile["settings"]["result_channels"])
         for channel, variable in self.result_channel_vars.items():
             variable.set(channel in selected_results)
+        selected_video_outputs = set(self.profile["settings"]["video_outputs"])
+        for output, variable in self.video_output_vars.items():
+            variable.set(output in selected_video_outputs)
         self.draft = []
         self.dirty = False
         self._load_bound_video(show_error=True)
@@ -290,6 +307,9 @@ class FluidSpaceApp:
             if not result_channels:
                 raise ValueError("Select at least one Result channel")
             self.profile.setdefault("settings", {})["result_channels"] = result_channels
+            self.profile["settings"]["video_outputs"] = [
+                output for output in VIDEO_OUTPUTS if self.video_output_vars[output].get()
+            ]
             path = save_profile(self.profile, require_complete=False)
             self.profile = load_profile(path.parent.name, require_complete=False)
             self.dirty = False
@@ -507,6 +527,17 @@ class FluidSpaceApp:
         )
         self.update_completeness()
 
+    def video_outputs_changed(self) -> None:
+        selected = [
+            output for output in VIDEO_OUTPUTS if self.video_output_vars[output].get()
+        ]
+        self.profile.setdefault("settings", {})["video_outputs"] = selected
+        self.dirty = True
+        self.status_var.set(
+            "Video outputs: " + (", ".join(name.title() for name in selected) if selected else "None")
+        )
+        self.update_completeness()
+
     def change_target(self) -> None:
         if self.draft:
             self.draft = []
@@ -588,6 +619,10 @@ class FluidSpaceApp:
             channel for channel in CHANNELS if self.result_channel_vars[channel].get()
         ]
         result_text = ", ".join(result_channels) if result_channels else "None selected"
+        video_outputs = [
+            output.title() for output in VIDEO_OUTPUTS if self.video_output_vars[output].get()
+        ]
+        video_text = ", ".join(video_outputs) if video_outputs else "None (images only)"
         if complete:
             text = (
                 f"Active: {active}\n"
@@ -596,6 +631,7 @@ class FluidSpaceApp:
                 f"Selected geometry: Zones {len(result_channels)}/{len(result_channels)} · "
                 f"ROIs {len(result_channels)}/{len(result_channels)}\n"
                 f"Results: {result_text}\n"
+                f"Videos: {video_text}\n"
                 f"Total bubbles: {bubble_count} (not used in time series)"
             )
         else:
@@ -605,6 +641,7 @@ class FluidSpaceApp:
                 "Missing:\n"
                 + "\n".join(f"• {item}" for item in missing)
                 + f"\nResults: {result_text}"
+                + f"\nVideos: {video_text}"
                 + f"\nTotal bubbles: {bubble_count} (not used in time series)"
             )
         self.geometry_status_var.set(text)
