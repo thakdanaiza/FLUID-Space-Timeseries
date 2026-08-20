@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "updated_at_utc": "2026-08-16T06:54:20.869134+00:00",
+  "frame_shape": [
+    340,
+    1090
+  ],
+  "source": {
+    "project": "C:\\Users\\fifa-\\OneDrive\\Project\\AIIM TIGERS-x\\code\\tigers-x2-MS-FLUID-ISS\\projects\\double_20260527_144620_000.roi.json",
+    "dxf": "C:\\Users\\fifa-\\OneDrive\\Project\\AIIM TIGERS-x\\code\\tigers-x2-MS-FLUID-ISS\\chip part x.DXF",
+    "frame_image": "C:\\Users\\fifa-\\OneDrive\\Project\\AIIM TIGERS-x\\code\\tigers-x2-MS-FLUID-ISS\\projects\\frame120.png"
+  },
+  "groups": {
+    "CH1": {
+      "channels": [
+        "CH1-1",
+        "CH1-2"
+      ],
+      "corners_xy": [
+        [
+          82.0,
+          28.0
+        ],
+        [
+          1023.0,
+          27.0
+        ],
+        [
+          1020.0,
+          184.0
+        ],
+        [
+          82.0,
+          188.0
+        ]
+      ],
+      "horizontal_flip": false
+    },
+    "CH2": {
+      "channels": [
+        "CH2-1",
+        "CH2-2"
+      ],
+      "corners_xy": [
+        [
+          78.0,
+          182.0
+        ],
+        [
+          1005.0,
+          180.0
+        ],
+        [
+          1000.0,
+          336.0
+        ],
+        [
+          80.0,
+          338.0
+        ]
+      ],
+      "horizontal_flip": true
+    }
+  }
+}
